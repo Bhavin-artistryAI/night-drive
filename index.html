@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Night Drive</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="hud">
+      <div class="panel">Distance <span id="score">0m</span></div>
+      <div class="panel">Best <span id="best">0m</span></div>
+    </div>
+
+    <canvas id="gameCanvas" width="480" height="720"></canvas>
+
+    <div id="overlay" class="overlay">
+      <h1>Night Drive</h1>
+      <p>Steer through traffic with precise lane changes. Keep your speed up, avoid collisions, and see how far you can push the car.</p>
+      <button id="startBtn">Start Drive</button>
+    </div>
+
+    <script src="script.js"></script>
+  </body>
+</html>
