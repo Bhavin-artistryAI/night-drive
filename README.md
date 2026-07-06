@@ -3,7 +3,7 @@
 A lightweight browser-based driving game built with HTML, CSS, and JavaScript.
 
 ## How to play
-- Use the left and right arrow keys or A/D to change lanes.
+- Use the left and right arrow keys or A/D or left right arrow key to change lanes.
 - Avoid traffic cars and survive as long as possible.
 - Your best distance is stored locally in the browser.
 
