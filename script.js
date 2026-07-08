@@ -4,6 +4,11 @@ const overlay = document.getElementById("overlay");
 const startBtn = document.getElementById("startBtn");
 const scoreEl = document.getElementById("score");
 const bestEl = document.getElementById("best");
+const playerNameEl = document.getElementById("playerName");
+const playerNameInput = document.getElementById("playerNameInput");
+const difficultyButtons = Array.from(document.querySelectorAll(".difficulty-btn"));
+const aiMessageEl = document.getElementById("aiMessage");
+const aiTipBtn = document.getElementById("aiTipBtn");
 
 const road = {
   x: canvas.width / 2 - 140,
@@ -24,28 +29,98 @@ const player = {
   speed: 0,
 };
 
+const difficultySettings = {
+  easy: { label: "Easy", speedMultiplier: 1.0, spawnTimer: 0.8, speedBonus: 0.8, maxSpeed: 8.5 },
+  medium: { label: "Medium", speedMultiplier: 1.25, spawnTimer: 0.6, speedBonus: 1.2, maxSpeed: 9.6 },
+  hard: { label: "Hard", speedMultiplier: 1.55, spawnTimer: 0.42, speedBonus: 1.6, maxSpeed: 10.4 },
+};
+
 let state = "idle";
 let score = 0;
-let best = Number(localStorage.getItem("night-drive-best") || 0);
+let best = 0;
 let traffic = [];
 let spawnTimer = 0.8;
 let roadOffset = 0;
 let lastTime = 0;
 let shake = 0;
+let difficulty = "easy";
+let playerName = localStorage.getItem("night-drive-player-name") || "Player";
+const MESH_API_KEY = "rsk_01KX02VF3BV88S6QH6W6HWRZ3F";
+const MESH_MODEL = "ai21/jamba-1-5-large-v1";
 
 function formatDistance(value) {
   return `${Math.floor(value)}m`;
 }
 
+function sanitizeName(value) {
+  const name = (value || "Player").trim();
+  return name || "Player";
+}
+
+function getDifficultyConfig() {
+  return difficultySettings[difficulty] || difficultySettings.easy;
+}
+
+function getBestStorageKey() {
+  const safeName = sanitizeName(playerName).toLowerCase().replace(/[^a-z0-9]+/g, "_");
+  return `night-drive-best-${difficulty}-${safeName}`;
+}
+
 function updateHud() {
   scoreEl.textContent = formatDistance(score);
   bestEl.textContent = formatDistance(best);
+  playerNameEl.textContent = sanitizeName(playerName);
+}
+
+async function askAiCoach(prompt) {
+  aiMessageEl.textContent = "Thinking...";
+  try {
+    const response = await fetch("/api/coach", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: MESH_MODEL,
+        messages: [
+          {
+            role: "system",
+            content: "You are a helpful racing game coach. Give concise, encouraging tips for a browser lane-switching car game.",
+          },
+          {
+            role: "user",
+            content: prompt,
+          },
+        ],
+        max_tokens: 60,
+      }),
+    });
+
+    const data = await response.json();
+    const message = data?.choices?.[0]?.message?.content || "Your coach is ready to help.";
+    aiMessageEl.textContent = message.trim();
+  } catch (error) {
+    aiMessageEl.textContent = "AI coach is currently unavailable. Keep driving!";
+  }
+}
+
+function updateDifficultyButtons() {
+  difficultyButtons.forEach((button) => {
+    const isActive = button.dataset.difficulty === difficulty;
+    button.classList.toggle("active", isActive);
+  });
+}
+
+function setDifficulty(nextDifficulty) {
+  difficulty = nextDifficulty;
+  updateDifficultyButtons();
+  resetGame();
 }
 
 function resetGame() {
   score = 0;
   traffic = [];
-  spawnTimer = 0.7;
+  spawnTimer = getDifficultyConfig().spawnTimer;
   roadOffset = 0;
   shake = 0;
   player.lane = 1;
@@ -57,34 +132,53 @@ function resetGame() {
   updateHud();
 }
 
+function beginRun() {
+  const defaultName = sanitizeName(playerNameInput.value || playerName);
+  const enteredName = window.prompt("Enter your player name to track your score:", defaultName);
+  if (enteredName === null) {
+    return;
+  }
+
+  playerName = sanitizeName(enteredName);
+  playerNameInput.value = playerName;
+  localStorage.setItem("night-drive-player-name", playerName);
+  startGame();
+}
+
 function startGame() {
   resetGame();
   overlay.classList.add("hidden");
   overlay.querySelector("h1").textContent = "Night Drive";
-  overlay.querySelector("p").textContent = "Steer through traffic with precise lane changes. Keep your speed up, avoid collisions, and see how far you can push the car.";
+  overlay.querySelector("p").textContent = `Difficulty: ${getDifficultyConfig().label}. Steer through traffic with precise lane changes and see how far you can go.`;
   startBtn.textContent = "Restart Drive";
 }
 
 function endGame() {
   state = "over";
-  best = Math.max(best, score);
-  localStorage.setItem("night-drive-best", String(Math.floor(best)));
+  const storageKey = getBestStorageKey();
+  const previousBest = Number(localStorage.getItem(storageKey) || 0);
+  if (score > previousBest) {
+    localStorage.setItem(storageKey, String(Math.floor(score)));
+  }
+  best = Math.max(previousBest, score);
   updateHud();
   overlay.classList.remove("hidden");
   overlay.querySelector("h1").textContent = "Crash";
-  overlay.querySelector("p").textContent = `You covered ${Math.floor(score)}m before the impact. Start again and beat your best run.`;
+  overlay.querySelector("p").textContent = `${sanitizeName(playerName)} reached ${Math.floor(score)}m on ${getDifficultyConfig().label} before the impact. Start again and beat your best run.`;
   startBtn.textContent = "Try Again";
 }
 
 function spawnTraffic() {
   const lane = Math.floor(Math.random() * lanePositions.length);
   const chosenLane = lane === player.lane ? (lane + 1) % lanePositions.length : lane;
+  const cfg = getDifficultyConfig();
+
   traffic.push({
     x: lanePositions[chosenLane],
     y: -90,
     width: 42,
     height: 74,
-    speed: 220 + Math.random() * 160,
+    speed: (220 + Math.random() * 160) * cfg.speedMultiplier,
     color: ["#ff5c7a", "#71d2ff", "#ffd46b", "#95ff9c"][Math.floor(Math.random() * 4)],
   });
 }
@@ -103,11 +197,12 @@ function update(dt) {
     return;
   }
 
-  roadOffset = (roadOffset + dt * 340) % 60;
-  score += dt * 90;
+  const cfg = getDifficultyConfig();
+  roadOffset = (roadOffset + dt * (320 + cfg.speedBonus * 80)) % 60;
+  score += dt * (80 + cfg.speedBonus * 18);
   updateHud();
 
-  player.speed = Math.min(10, player.speed + dt * 1.2);
+  player.speed = Math.min(cfg.maxSpeed, player.speed + dt * (1.1 + cfg.speedBonus * 0.25));
   player.vx += (player.targetX - player.x) * dt * 7;
   player.vx *= 0.8;
   player.x += player.vx * dt * 8;
@@ -119,11 +214,11 @@ function update(dt) {
   spawnTimer -= dt;
   if (spawnTimer <= 0) {
     spawnTraffic();
-    spawnTimer = Math.max(0.32, 0.78 - score / 1400);
+    spawnTimer = Math.max(0.24, cfg.spawnTimer - score / (1400 + cfg.speedBonus * 200));
   }
 
   traffic.forEach((car) => {
-    car.y += (car.speed + player.speed * 32) * dt;
+    car.y += (car.speed + player.speed * (20 + cfg.speedBonus * 12)) * dt;
   });
 
   traffic = traffic.filter((car) => car.y < canvas.height + 120);
@@ -277,9 +372,28 @@ window.addEventListener("keydown", (event) => {
   }
 });
 
-startBtn.addEventListener("click", () => {
-  startGame();
+difficultyButtons.forEach((button) => {
+  button.addEventListener("click", () => {
+    setDifficulty(button.dataset.difficulty);
+  });
 });
 
+playerNameInput.value = playerName;
+playerNameInput.addEventListener("input", (event) => {
+  playerName = sanitizeName(event.target.value);
+  updateHud();
+});
+
+startBtn.addEventListener("click", () => {
+  beginRun();
+});
+
+aiTipBtn.addEventListener("click", () => {
+  const context = `The current difficulty is ${getDifficultyConfig().label}. Give one short coaching tip for this driver.`;
+  askAiCoach(context);
+});
+
+updateDifficultyButtons();
 updateHud();
+askAiCoach("Welcome to Night Drive. Give one short coaching tip.");
 requestAnimationFrame(frame);

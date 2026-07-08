@@ -8,16 +8,37 @@
   </head>
   <body>
     <div class="hud">
+      <div class="panel">Player <span id="playerName">Player</span></div>
       <div class="panel">Distance <span id="score">0m</span></div>
       <div class="panel">Best <span id="best">0m</span></div>
     </div>
 
     <canvas id="gameCanvas" width="480" height="720"></canvas>
 
+    <div id="aiPanel" class="ai-panel">
+      <div class="ai-title">AI Coach</div>
+      <div id="aiMessage" class="ai-message">Ask for a tip or start the race to get guidance.</div>
+      <button id="aiTipBtn">Get Tip</button>
+    </div>
+
     <div id="overlay" class="overlay">
-      <h1>Night Drive</h1>
-      <p>Steer through traffic with precise lane changes. Keep your speed up, avoid collisions, and see how far you can push the car.</p>
-      <button id="startBtn">Start Drive</button>
+      <div class="card">
+        <h1>Night Drive</h1>
+        <p>Steer through traffic with precise lane changes. Keep your speed up, avoid collisions, and see how far you can push the car.</p>
+
+        <div class="difficulty-group" role="group" aria-label="Choose difficulty">
+          <button class="difficulty-btn active" data-difficulty="easy">Easy</button>
+          <button class="difficulty-btn" data-difficulty="medium">Medium</button>
+          <button class="difficulty-btn" data-difficulty="hard">Hard</button>
+        </div>
+
+        <label class="setup-row" for="playerNameInput">
+          <span>Player Name</span>
+          <input id="playerNameInput" type="text" maxlength="16" placeholder="Enter your name" />
+        </label>
+
+        <button id="startBtn">Start Drive</button>
+      </div>
     </div>
 
     <script src="script.js"></script>
